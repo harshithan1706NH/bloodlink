@@ -15,12 +15,12 @@ import java.util.*;
 /** A deliberately small Swing client. Start the Spring API first, then run this class. */
 public class BloodLinkClient extends JFrame {
     private static final String API = "http://localhost:8080/api";
-    private static final Color RED = new Color(111, 78, 181);
-    private static final Color DARK = new Color(45, 38, 79);
-    private static final Color BACKGROUND = new Color(247, 245, 252);
-    private static final Color VIOLET = new Color(103, 75, 177);
-    private static final Color LAVENDER = new Color(238, 232, 248);
-    private static final Color LAVENDER_LIGHT = new Color(246, 241, 252);
+    private static final Color RED = new Color(180, 45, 65);
+    private static final Color DARK = new Color(76, 24, 39);
+    private static final Color BACKGROUND = new Color(250, 246, 247);
+    private static final Color VIOLET = new Color(166, 43, 63);
+    private static final Color LAVENDER = new Color(246, 232, 235);
+    private static final Color LAVENDER_LIGHT = new Color(255, 250, 250);
     private static final String FONT_FAMILY = "Avenir Next";
     private final HttpClient http = HttpClient.newHttpClient();
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
@@ -61,9 +61,12 @@ public class BloodLinkClient extends JFrame {
         JPanel greetingText = new JPanel(new GridLayout(2, 1, 0, 5)); greetingText.setOpaque(false); greetingText.add(welcome); greetingText.add(help); greeting.add(greetingText, BorderLayout.WEST); page.add(greeting, BorderLayout.NORTH);
         JPanel center = new JPanel(new GridLayout(2, 1, 0, 20)); center.setOpaque(false);
         JPanel cards = new JPanel(new GridLayout(1, 3, 18, 0)); cards.setOpaque(false);
-        cards.add(statCard("DONORS", "Search local donors", "♥", new Color(130, 94, 202), () -> tabs.setSelectedIndex(1)));
-        cards.add(statCard("REQUESTS", "Track urgent needs", "!", new Color(93, 121, 194), () -> tabs.setSelectedIndex(3)));
-        cards.add(statCard("COORDINATE", "Make a difference", "✓", new Color(83, 153, 172), () -> tabs.setSelectedIndex(2)));
+        cards.add(statCard("DONORS", "Search local donors", "♥",
+        new Color(180, 45, 65), () -> tabs.setSelectedIndex(1)));
+        cards.add(statCard("REQUESTS", "Track urgent needs", "!",
+        new Color(145, 55, 75), () -> tabs.setSelectedIndex(3)));
+        cards.add(statCard("COORDINATE", "Make a difference", "✓",
+        new Color(105, 100, 115), () -> tabs.setSelectedIndex(2)));
         center.add(cards);
         JPanel actions = new JPanel(new GridLayout(1, 2, 18, 0)); actions.setOpaque(false);
         actions.add(actionCard("Need blood urgently?", "Create a request and share the patient details.", "Create blood request", () -> tabs.setSelectedIndex(4), new Color(238, 232, 250)));
