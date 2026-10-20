@@ -10,7 +10,7 @@ public class DonorController {
     private final DonorRepository donors;
     public DonorController(DonorRepository donors) { this.donors = donors; }
     @GetMapping public List<Donor> all(@RequestParam(required=false) BloodGroup bloodGroup, @RequestParam(required=false) String city) {
-        if (bloodGroup != null && city != null && !city.isBlank()) return donors.findByBloodGroupAndCityIgnoreCaseAndAvailableTrue(bloodGroup, city.trim());
+        if (bloodGroup != null && city != null && !city.isBlank()) return donors.findAvailableDonors(bloodGroup, city.trim());
         return donors.findAll();
     }
     @PostMapping public ResponseEntity<Donor> create(@RequestBody Donor donor) { return ResponseEntity.status(HttpStatus.CREATED).body(donors.save(donor)); }

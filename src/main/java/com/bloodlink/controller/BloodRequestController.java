@@ -9,7 +9,10 @@ import java.util.*;
 public class BloodRequestController {
     private final BloodRequestRepository requests;
     public BloodRequestController(BloodRequestRepository requests) { this.requests = requests; }
-    @GetMapping public List<BloodRequest> all() { return requests.findAll(); }
+    @GetMapping public List<BloodRequest> all(@RequestParam(required=false) String city) {
+        if (city != null && !city.isBlank()) return requests.findByStatusAndCity(RequestStatus.OPEN, city.trim());
+        return requests.findAll();
+    }
     @PostMapping public ResponseEntity<BloodRequest> create(@RequestBody BloodRequest request) { return ResponseEntity.status(HttpStatus.CREATED).body(requests.save(request)); }
     @PatchMapping("/{id}/fulfill") public BloodRequest fulfill(@PathVariable Long id) {
         BloodRequest request = requests.findById(id).orElseThrow(() -> new NoSuchElementException("Request not found")); request.setStatus(RequestStatus.FULFILLED); return requests.save(request);
