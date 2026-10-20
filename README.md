@@ -1,6 +1,6 @@
 # BloodLink
 
-A small end-to-end blood-donor coordination system. It has a Java Swing desktop frontend, two Spring Boot REST services, Hibernate/JPA persistence, and PostgreSQL.
+A small end-to-end blood-donor coordination system with a Java Swing desktop frontend, two Spring Boot REST services, Hibernate/JPA persistence, and PostgreSQL.
 
 ## What it does
 
@@ -44,7 +44,7 @@ Prerequisites: Java 17+, Maven 3.9+, and a running PostgreSQL server.
    mvn spring-boot:run
    ```
 
-The main API is available at `http://localhost:8080/api`. The defaults are in `src/main/resources/application.properties`; override them using `DB_URL`, `DB_USER`, and `DB_PASSWORD` if using your own PostgreSQL server.
+The main API is available at `http://localhost:8080/api`, while notifications are served at `http://localhost:8081/api/notifications`. The defaults are in `src/main/resources/application.properties`; override them using `DB_URL`, `DB_USER`, and `DB_PASSWORD` if using your own PostgreSQL server.
 
 ## API summary
 
