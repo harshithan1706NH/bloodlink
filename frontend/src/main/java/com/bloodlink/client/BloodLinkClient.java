@@ -21,6 +21,8 @@ import java.util.Map;
 public class BloodLinkClient extends JFrame {
     private static final String API = System.getProperty(
             "bloodlink.api", System.getenv().getOrDefault("BLOODLINK_API_URL", "http://localhost:8080/api"));
+    private static final String NOTIFICATION_API = System.getProperty(
+            "notification.api", System.getenv().getOrDefault("NOTIFICATION_API_URL", "http://localhost:8081/api"));
     private static final Color RED = new Color(180, 45, 65);
     private static final Color DARK = new Color(76, 24, 39);
     private static final Color BACKGROUND = new Color(250, 246, 247);
@@ -33,9 +35,11 @@ public class BloodLinkClient extends JFrame {
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
     private final DefaultTableModel donorRows = table("ID", "Name", "Phone", "Group", "City", "Available");
     private final DefaultTableModel requestRows = table("ID", "Patient", "Group", "Hospital", "City", "Units", "Needed by", "Status");
+    private final DefaultTableModel notificationRows = table("ID", "Recipient", "Message", "Sent at");
     private final JComboBox<BloodGroup> searchGroup = new JComboBox<>(BloodGroup.values());
     private final JTextField searchCity = new JTextField(12);
     private final JTabbedPane tabs = new JTabbedPane();
+    private final JLabel dashboardSummary = new JLabel("Loading live dashboard summary...");
 
     public BloodLinkClient() {
         super("BloodLink - Donor Coordination");
@@ -50,6 +54,7 @@ public class BloodLinkClient extends JFrame {
         tabs.add("Register donor", donorForm());
         tabs.add("Blood requests", requestPanel());
         tabs.add("Create request", requestForm());
+        tabs.add("Notifications", notificationPanel());
 
         JPanel content = new JPanel(new BorderLayout());
         content.setBackground(BACKGROUND);
@@ -58,6 +63,8 @@ public class BloodLinkClient extends JFrame {
         add(content);
         refreshDonors();
         refreshRequests();
+        refreshDashboard();
+        refreshNotifications();
     }
 
     private JPanel header() {
@@ -107,13 +114,17 @@ public class BloodLinkClient extends JFrame {
         cards.add(statCard("COORDINATE", "Make a difference", "✓", new Color(105, 75, 88), () -> tabs.setSelectedIndex(2)));
         JPanel actions = new JPanel(new GridLayout(1, 2, 18, 0));
         actions.setOpaque(false);
-        actions.add(actionCard("Need blood urgently?", "Create a request and share the patient details.", "Create blood request", () -> tabs.setSelectedIndex(4)));
-        actions.add(actionCard("Want to donate?", "Register a donor so patients can find help.", "Register donor", () -> tabs.setSelectedIndex(2)));
+        actions.add(actionCard("Need blood urgently?", "Create a request and share the patient details.", "Create blood request", () -> tabs.setSelectedIndex(4), true));
+        actions.add(actionCard("Want to donate?", "Register a donor so patients can find help.", "Register donor", () -> tabs.setSelectedIndex(2), true));
         JPanel center = new JPanel(new GridLayout(2, 1, 0, 20));
         center.setOpaque(false);
         center.add(cards);
         center.add(actions);
         page.add(center, BorderLayout.CENTER);
+        dashboardSummary.setFont(font(Font.BOLD, 14));
+        dashboardSummary.setForeground(DARK);
+        dashboardSummary.setBorder(BorderFactory.createEmptyBorder(12, 4, 4, 4));
+        page.add(dashboardSummary, BorderLayout.SOUTH);
         return page;
     }
 
@@ -139,7 +150,7 @@ public class BloodLinkClient extends JFrame {
         return clickable(card, action);
     }
 
-    private JPanel actionCard(String title, String description, String buttonText, Runnable action) {
+    private JPanel actionCard(String title, String description, String buttonText, Runnable action, boolean outlined) {
         JPanel card = new JPanel(new BorderLayout(8, 8));
         card.setBackground(PALE);
         card.setBorder(BorderFactory.createCompoundBorder(
@@ -150,7 +161,7 @@ public class BloodLinkClient extends JFrame {
         heading.setForeground(DARK);
         JLabel desc = new JLabel("<html>" + description + "</html>");
         desc.setFont(font(Font.PLAIN, 13));
-        JButton button = button(buttonText);
+        JButton button = outlined ? outlineButton(buttonText) : button(buttonText);
         button.addActionListener(event -> action.run());
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         bottom.setOpaque(false);
@@ -191,7 +202,7 @@ public class BloodLinkClient extends JFrame {
         JComboBox<BloodGroup> donorGroup = new JComboBox<>(BloodGroup.values());
         JCheckBox available = new JCheckBox("Available to donate", true);
         available.setBackground(PALE_LIGHT);
-        JButton save = button("Register donor");
+        JButton save = outlineButton("Register donor");
         JButton clear = outlineButton("Clear form");
         JPanel form = form();
         add(form, "Name", name);
@@ -219,22 +230,26 @@ public class BloodLinkClient extends JFrame {
         JPanel panel = page();
         JTable table = styledTable(requestRows);
         JButton fulfill = button("Mark selected request fulfilled");
-        JButton refresh = outlineButton("Refresh list");
         fulfill.addActionListener(event -> {
             int row = table.getSelectedRow();
             if (row < 0) { message("Select a request first"); return; }
             patch("/requests/" + requestRows.getValueAt(row, 0) + "/fulfill", this::refreshRequests);
         });
-        refresh.addActionListener(event -> refreshRequests());
         panel.add(sectionHeader("Current blood requests", "Review requests and mark them fulfilled when coordination is complete."), BorderLayout.NORTH);
         JScrollPane requestScroll = new JScrollPane(table);
         requestScroll.getViewport().setBackground(PALE);
         panel.add(requestScroll, BorderLayout.CENTER);
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         actions.setBackground(BACKGROUND);
-        actions.add(refresh);
         actions.add(fulfill);
         panel.add(actions, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private JPanel notificationPanel() {
+        JPanel panel = page();
+        panel.add(sectionHeader("Notification inbox", "Messages sent by the notification microservice to matching donors."), BorderLayout.NORTH);
+        panel.add(scroll(notificationRows), BorderLayout.CENTER);
         return panel;
     }
 
@@ -245,7 +260,8 @@ public class BloodLinkClient extends JFrame {
         JTextField units = new JTextField("1");
         JTextField date = new JTextField(LocalDate.now().plusDays(1).toString());
         JComboBox<BloodGroup> requestGroup = new JComboBox<>(BloodGroup.values());
-        JButton save = button("Create request");
+        JLabel compatibility = new JLabel("Compatible donor groups will appear here.");
+        JButton save = outlineButton("Create request");
         JButton clear = outlineButton("Clear form");
         JPanel form = form();
         add(form, "Patient name", patient);
@@ -254,8 +270,13 @@ public class BloodLinkClient extends JFrame {
         add(form, "City", requestCity);
         add(form, "Units needed", units);
         add(form, "Needed by (YYYY-MM-DD)", date);
+        form.add(new JLabel("Compatibility"));
+        form.add(compatibility);
         form.add(save);
         form.add(clear);
+        requestGroup.addActionListener(event -> refreshCompatibility(
+                (BloodGroup) requestGroup.getSelectedItem(), compatibility));
+        refreshCompatibility((BloodGroup) requestGroup.getSelectedItem(), compatibility);
         clear.addActionListener(event -> clear(patient, hospital, requestCity, units, date));
         save.addActionListener(event -> {
             try {
@@ -266,9 +287,11 @@ public class BloodLinkClient extends JFrame {
                         "city", requestCity.getText().trim(),
                         "unitsNeeded", Integer.parseInt(units.getText().trim()),
                         "neededBy", date.getText().trim()), () -> {
+                    notifyMatchingDonors(requestGroup.getSelectedItem().toString(), requestCity.getText().trim());
                     clear(patient, hospital, requestCity, units, date);
                     refreshRequests();
-                });
+                    refreshNotifications();
+                }, null);
             } catch (NumberFormatException exception) {
                 message("Units must be a number");
             }
@@ -288,6 +311,7 @@ public class BloodLinkClient extends JFrame {
                 donorRows.addRow(new Object[]{donor.get("id"), donor.get("name"), donor.get("phone"),
                         donor.get("bloodGroup"), donor.get("city"), donor.get("available")});
             }
+            refreshDashboard();
         } catch (Exception exception) {
             message("Cannot reach API. Start the Spring Boot server.\n" + exception.getMessage());
         }
@@ -301,8 +325,58 @@ public class BloodLinkClient extends JFrame {
                         request.get("hospital"), request.get("city"), request.get("unitsNeeded"),
                         request.get("neededBy"), request.get("status")});
             }
+            refreshDashboard();
         } catch (Exception exception) {
             // The donor search tab reports connection errors; keep startup quiet if the API is still starting.
+        }
+    }
+
+    private void refreshDashboard() {
+        try {
+            Map<String, Object> summary = getObject(API + "/dashboard/summary");
+            dashboardSummary.setText(String.format(
+                    "Live summary: %s total donors (%s available)  •  %s total requests (%s open, %s fulfilled)",
+                    summary.get("totalDonors"), summary.get("availableDonors"), summary.get("totalRequests"),
+                    summary.get("openRequests"), summary.get("fulfilledRequests")));
+        } catch (Exception exception) {
+            dashboardSummary.setText("Live dashboard summary unavailable");
+        }
+    }
+
+    private void refreshNotifications() {
+        try {
+            notificationRows.setRowCount(0);
+            for (Map<String, Object> notification : get(NOTIFICATION_API + "/notifications")) {
+                notificationRows.addRow(new Object[]{notification.get("id"), notification.get("recipient"),
+                        notification.get("message"), notification.get("sentAt")});
+            }
+        } catch (Exception exception) {
+            // The notification service is optional while the rest of the app is starting.
+        }
+    }
+
+    private void refreshCompatibility(BloodGroup recipientBloodGroup, JLabel label) {
+        if (recipientBloodGroup == null) return;
+        try {
+            Map<String, Object> compatibility = getObject(API + "/compatibility/" + recipientBloodGroup);
+            label.setText("Compatible donor groups: " + compatibility.get("compatibleDonorGroups"));
+        } catch (Exception exception) {
+            label.setText("Compatibility information unavailable");
+        }
+    }
+
+    private void notifyMatchingDonors(String bloodGroup, String city) {
+        try {
+            String url = API + "/donors?bloodGroup=" + bloodGroup
+                    + "&city=" + URLEncoder.encode(city, StandardCharsets.UTF_8);
+            int count = get(url).size();
+            String donorLabel = count == 1 ? "available donor" : "available donors";
+            message("Request created successfully.\n\n"
+                    + count + " matching " + donorLabel + " found for " + bloodGroup
+                    + " in " + city + ".");
+        } catch (Exception exception) {
+            message("Request created successfully, but matching donors could not be counted.\n"
+                    + exception.getMessage());
         }
     }
 
@@ -313,15 +387,26 @@ public class BloodLinkClient extends JFrame {
         return json.readValue(response.body(), new TypeReference<>() { });
     }
 
+    private Map<String, Object> getObject(String url) throws Exception {
+        HttpResponse<String> response = http.send(
+                HttpRequest.newBuilder(URI.create(url)).GET().build(), HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() / 100 != 2) throw new IllegalStateException(response.body());
+        return json.readValue(response.body(), new TypeReference<>() { });
+    }
+
     private void post(String path, Map<String, Object> body, Runnable done) {
-        send("POST", path, body, done);
+        send("POST", path, body, done, "Saved successfully");
+    }
+
+    private void post(String path, Map<String, Object> body, Runnable done, String successMessage) {
+        send("POST", path, body, done, successMessage);
     }
 
     private void patch(String path, Runnable done) {
-        send("PATCH", path, Map.of(), done);
+        send("PATCH", path, Map.of(), done, "Saved successfully");
     }
 
-    private void send(String method, String path, Map<String, Object> body, Runnable done) {
+    private void send(String method, String path, Map<String, Object> body, Runnable done, String successMessage) {
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(API + path))
                     .header("Content-Type", "application/json")
@@ -329,7 +414,7 @@ public class BloodLinkClient extends JFrame {
                     .build();
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() / 100 != 2) throw new IllegalStateException(response.body());
-            message("Saved successfully");
+            if (successMessage != null && !successMessage.isBlank()) message(successMessage);
             done.run();
         } catch (Exception exception) {
             message("Could not save: " + exception.getMessage());

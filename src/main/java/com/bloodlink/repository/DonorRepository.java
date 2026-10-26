@@ -6,6 +6,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface DonorRepository extends JpaRepository<Donor, Long> {
+    long countByAvailableTrue();
+
     @Query("""
             select d from Donor d
             where d.bloodGroup = :bloodGroup

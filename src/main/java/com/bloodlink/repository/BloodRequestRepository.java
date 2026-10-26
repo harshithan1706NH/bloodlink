@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface BloodRequestRepository extends JpaRepository<BloodRequest, Long> {
+    long countByStatus(RequestStatus status);
+
     @Query("""
             select r from BloodRequest r
             where r.status = :status
